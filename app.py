@@ -1,10 +1,18 @@
 import os
 import sqlite3
+from datetime import datetime
 
 from flask import Flask, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from database.db import create_user, get_db, get_user_by_email, init_db, seed_db
+from database.db import (
+    create_user,
+    get_db,
+    get_user_by_email,
+    get_user_by_id,
+    init_db,
+    seed_db,
+)
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-only-change-me")
@@ -92,13 +100,61 @@ def privacy():
     return render_template("privacy.html")
 
 
+@app.route("/profile")
+def profile():
+    if not session.get("user_id"):
+        return redirect(url_for("login"))
+
+    row = get_user_by_id(session["user_id"])
+    if row is None:
+        session.clear()
+        return redirect(url_for("login"))
+
+    user = {
+        "name": row["name"],
+        "email": row["email"],
+        "member_since": datetime.strptime(
+            row["created_at"], "%Y-%m-%d %H:%M:%S"
+        ).strftime("%B %Y"),
+    }
+
+    # Stats, transactions and categories are hardcoded for Step 4 —
+    # replaced by real queries via get_db() in Step 5.
+    stats = {
+        "total_spent": 8049,
+        "transaction_count": 8,
+        "top_category": "Bills",
+    }
+    transactions = [
+        {"date": "28 Sep 2026", "description": "Swiggy dinner", "category": "Food", "amount": 420},
+        {"date": "26 Sep 2026", "description": "Metro card recharge", "category": "Transport", "amount": 500},
+        {"date": "24 Sep 2026", "description": "Electricity bill", "category": "Bills", "amount": 1800},
+        {"date": "21 Sep 2026", "description": "Groceries from DMart", "category": "Food", "amount": 1250},
+        {"date": "18 Sep 2026", "description": "Myntra order", "category": "Shopping", "amount": 2150},
+        {"date": "15 Sep 2026", "description": "Movie tickets at PVR", "category": "Entertainment", "amount": 600},
+        {"date": "12 Sep 2026", "description": "Ola cab", "category": "Transport", "amount": 330},
+        {"date": "10 Sep 2026", "description": "Broadband bill", "category": "Bills", "amount": 999},
+    ]
+    categories = [
+        {"name": "Bills", "total": 2799, "percent": 35},
+        {"name": "Shopping", "total": 2150, "percent": 27},
+        {"name": "Food", "total": 1670, "percent": 21},
+        {"name": "Transport", "total": 830, "percent": 10},
+        {"name": "Entertainment", "total": 600, "percent": 7},
+    ]
+
+    return render_template(
+        "profile.html",
+        user=user,
+        stats=stats,
+        transactions=transactions,
+        categories=categories,
+    )
+
+
 # ------------------------------------------------------------------ #
 # Placeholder routes — students will implement these                  #
 # ------------------------------------------------------------------ #
-
-@app.route("/profile")
-def profile():
-    return "Profile page — coming in Step 4"
 
 
 @app.route("/expenses/add")
