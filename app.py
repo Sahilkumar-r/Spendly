@@ -1,11 +1,15 @@
+import math
 import os
+import secrets
 import sqlite3
 from datetime import datetime
+from functools import wraps
 
 from flask import Flask, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from database.db import (
+    create_expense,
     create_user,
     get_db,
     get_user_by_email,
@@ -14,12 +18,37 @@ from database.db import (
     seed_db,
 )
 
+CATEGORIES = [
+    "Food",
+    "Transport",
+    "Bills",
+    "Health",
+    "Entertainment",
+    "Shopping",
+    "Other",
+]
+MAX_DESCRIPTION_LENGTH = 200
+MAX_AMOUNT = 10_000_000
+
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "dev-only-change-me")
+# Without SECRET_KEY set, fall back to a random per-process key: sessions
+# reset on restart, but there is no guessable key in the source.
+app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
 with app.app_context():
     init_db()
     seed_db()
+
+
+def login_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if not session.get("user_id"):
+            return redirect(url_for("login"))
+        return view(*args, **kwargs)
+
+    return wrapped
 
 
 # ------------------------------------------------------------------ #
@@ -221,10 +250,8 @@ def _build_categories(user_id, start_date=None, end_date=None):
 
 
 @app.route("/profile")
+@login_required
 def profile():
-    if not session.get("user_id"):
-        return redirect(url_for("login"))
-
     row = get_user_by_id(session["user_id"])
     if row is None:
         session.clear()
@@ -263,9 +290,73 @@ def profile():
 # ------------------------------------------------------------------ #
 
 
-@app.route("/expenses/add")
+def _render_expense_form(values, error=None):
+    return render_template(
+        "add_expense.html",
+        categories=CATEGORIES,
+        values=values,
+        error=error,
+        max_description_length=MAX_DESCRIPTION_LENGTH,
+    )
+
+
+def _validate_expense_form(values):
+    """Return (amount, error). `error` is None when the form is valid."""
+    try:
+        amount = float(values["amount"])
+    except ValueError:
+        return None, "Enter a valid amount."
+    if not math.isfinite(amount):
+        return None, "Enter a valid amount."
+    amount = round(amount, 2)
+    if amount <= 0:
+        return None, "Amount must be greater than zero."
+    if amount > MAX_AMOUNT:
+        return None, f"Amount must be {MAX_AMOUNT:,} or less."
+
+    if values["category"] not in CATEGORIES:
+        return None, "Please choose a category."
+
+    if not _is_iso_date(values["date"]):
+        return None, "Enter a valid date."
+
+    if len(values["description"]) > MAX_DESCRIPTION_LENGTH:
+        return None, (
+            f"Description must be {MAX_DESCRIPTION_LENGTH} characters or fewer."
+        )
+
+    return amount, None
+
+
+@app.route("/expenses/add", methods=["GET", "POST"])
+@login_required
 def add_expense():
-    return "Add expense — coming in Step 7"
+    if request.method == "GET":
+        return _render_expense_form(
+            {
+                "amount": "",
+                "category": "",
+                "date": datetime.now().strftime("%Y-%m-%d"),
+                "description": "",
+            }
+        )
+
+    values = {
+        key: request.form.get(key, "").strip()
+        for key in ("amount", "category", "date", "description")
+    }
+    amount, error = _validate_expense_form(values)
+    if error:
+        return _render_expense_form(values, error)
+
+    create_expense(
+        session["user_id"],
+        amount,
+        values["category"],
+        values["date"],
+        values["description"] or None,
+    )
+    return redirect(url_for("profile"))
 
 
 @app.route("/expenses/<int:id>/edit")
@@ -279,4 +370,4 @@ def delete_expense(id):
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5001)
+    app.run(debug=os.environ.get("FLASK_DEBUG") == "1", port=5001)
