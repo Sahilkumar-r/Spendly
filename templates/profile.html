@@ -16,6 +16,26 @@
             </div>
         </div>
 
+        <form class="profile-filter" method="get" action="{{ url_for('profile') }}">
+            {% if filter_error %}
+            <div class="auth-error profile-filter-error" role="alert">{{ filter_error }}</div>
+            {% endif %}
+            <div class="profile-filter-fields">
+                <div class="form-group">
+                    <label for="start_date">From</label>
+                    <input class="form-input" type="date" id="start_date" name="start_date" value="{{ filters.start_date }}">
+                </div>
+                <div class="form-group">
+                    <label for="end_date">To</label>
+                    <input class="form-input" type="date" id="end_date" name="end_date" value="{{ filters.end_date }}">
+                </div>
+                <div class="profile-filter-actions">
+                    <button type="submit" class="btn-primary">Apply</button>
+                    <a class="btn-ghost" href="{{ url_for('profile') }}">Clear</a>
+                </div>
+            </div>
+        </form>
+
         <div class="profile-stats">
             <div class="profile-stat">
                 <span class="profile-stat-label">Total spent</span>
@@ -53,7 +73,9 @@
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="4">No transactions yet.</td>
+                            <td colspan="4">
+                                {% if filters.active %}No transactions in this period.{% else %}No transactions yet.{% endif %}
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -73,7 +95,9 @@
                     <progress class="profile-cat-bar" value="{{ c.percent }}" max="100">{{ c.percent }}%</progress>
                 </li>
                 {% else %}
-                <li class="profile-cat-empty">No spending to break down yet.</li>
+                <li class="profile-cat-empty">
+                    {% if filters.active %}No spending in this period.{% else %}No spending to break down yet.{% endif %}
+                </li>
                 {% endfor %}
             </ul>
         </div>

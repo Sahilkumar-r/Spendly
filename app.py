@@ -100,14 +100,56 @@ def privacy():
     return render_template("privacy.html")
 
 
-# ==== SECTION 1: TRANSACTIONS (sub-agent-01) ====
-def _build_transactions(user_id):
+# --- Profile page helpers ---
+
+def _date_clause(start_date=None, end_date=None):
+    # SECURITY: only fixed SQL literals go in `sql`; user values go in `params`
+    # and are always bound with `?`. Never interpolate a date into the SQL.
+    sql, params = "", []
+    if start_date:
+        sql += " AND date >= ?"
+        params.append(start_date)
+    if end_date:
+        sql += " AND date <= ?"
+        params.append(end_date)
+    return sql, params
+
+
+def _is_iso_date(value):
+    # The round trip rejects lenient input such as "2026-1-5", which strptime
+    # accepts but which would not compare correctly against stored text dates.
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").strftime("%Y-%m-%d") == value
+    except ValueError:
+        return False
+
+
+def _parse_date_filters(args):
+    """Return (filters, error). `filters` holds the raw form values and
+    whether a valid filter is active; on error nothing is applied."""
+    start = args.get("start_date", "").strip()
+    end = args.get("end_date", "").strip()
+    filters = {"start_date": start, "end_date": end, "active": False}
+
+    if any(v and not _is_iso_date(v) for v in (start, end)):
+        return filters, "Enter valid dates in YYYY-MM-DD format."
+    if start and end and start > end:
+        return filters, "Start date must be on or before end date."
+
+    filters["active"] = bool(start or end)
+    return filters, None
+
+
+def _build_transactions(user_id, start_date=None, end_date=None):
+    clause, extra = _date_clause(start_date, end_date)
     conn = get_db()
     try:
         rows = conn.execute(
             "SELECT date, description, category, amount FROM expenses "
-            "WHERE user_id = ? ORDER BY date DESC, id DESC LIMIT 10",
-            (user_id,),
+            "WHERE user_id = ?"
+            + clause
+            + " ORDER BY date DESC, id DESC LIMIT 10",
+            (user_id, *extra),
         ).fetchall()
     finally:
         conn.close()
@@ -122,22 +164,20 @@ def _build_transactions(user_id):
     ]
 
 
-# ==== END SECTION 1 ====
-
-
-# ==== SECTION 2: SUMMARY (sub-agent-02) ====
-def _build_stats(user_id):
+def _build_stats(user_id, start_date=None, end_date=None):
+    clause, extra = _date_clause(start_date, end_date)
     conn = get_db()
     try:
         totals = conn.execute(
             "SELECT COALESCE(SUM(amount), 0) AS total, COUNT(*) AS cnt "
-            "FROM expenses WHERE user_id = ?",
-            (user_id,),
+            "FROM expenses WHERE user_id = ?" + clause,
+            (user_id, *extra),
         ).fetchone()
         top = conn.execute(
-            "SELECT category FROM expenses WHERE user_id = ? "
-            "GROUP BY category ORDER BY SUM(amount) DESC LIMIT 1",
-            (user_id,),
+            "SELECT category FROM expenses WHERE user_id = ?"
+            + clause
+            + " GROUP BY category ORDER BY SUM(amount) DESC LIMIT 1",
+            (user_id, *extra),
         ).fetchone()
     finally:
         conn.close()
@@ -148,17 +188,15 @@ def _build_stats(user_id):
     }
 
 
-# ==== END SECTION 2 ====
-
-
-# ==== SECTION 3: CATEGORIES (sub-agent-03) ====
-def _build_categories(user_id):
+def _build_categories(user_id, start_date=None, end_date=None):
+    clause, extra = _date_clause(start_date, end_date)
     conn = get_db()
     try:
         rows = conn.execute(
-            "SELECT category, SUM(amount) FROM expenses WHERE user_id = ? "
-            "GROUP BY category ORDER BY SUM(amount) DESC",
-            (user_id,),
+            "SELECT category, SUM(amount) FROM expenses WHERE user_id = ?"
+            + clause
+            + " GROUP BY category ORDER BY SUM(amount) DESC",
+            (user_id, *extra),
         ).fetchall()
     finally:
         conn.close()
@@ -182,9 +220,6 @@ def _build_categories(user_id):
     return cats
 
 
-# ==== END SECTION 3 ====
-
-
 @app.route("/profile")
 def profile():
     if not session.get("user_id"):
@@ -203,10 +238,14 @@ def profile():
         ).strftime("%B %Y"),
     }
 
-    uid = session["user_id"]
-    stats = _build_stats(uid)
-    transactions = _build_transactions(uid)
-    categories = _build_categories(uid)
+    user_id = session["user_id"]
+    filters, filter_error = _parse_date_filters(request.args)
+    start_date = filters["start_date"] if filters["active"] else None
+    end_date = filters["end_date"] if filters["active"] else None
+
+    stats = _build_stats(user_id, start_date, end_date)
+    transactions = _build_transactions(user_id, start_date, end_date)
+    categories = _build_categories(user_id, start_date, end_date)
 
     return render_template(
         "profile.html",
@@ -214,6 +253,8 @@ def profile():
         stats=stats,
         transactions=transactions,
         categories=categories,
+        filters=filters,
+        filter_error=filter_error,
     )
 
 
