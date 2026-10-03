@@ -7,3 +7,9 @@ __pycache__/
 .DS_Store
 .claude/plans/
 spendly.db
+
+# uv / Python tooling
+.venv/
+.python-version
+pyproject.toml
+uv.lock
