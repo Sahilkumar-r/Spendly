@@ -19,7 +19,7 @@
         <div class="profile-stats">
             <div class="profile-stat">
                 <span class="profile-stat-label">Total spent</span>
-                <span class="profile-stat-value">₹{{ "{:,}".format(stats.total_spent) }}</span>
+                <span class="profile-stat-value">₹{{ "{:,.2f}".format(stats.total_spent) }}</span>
             </div>
             <div class="profile-stat">
                 <span class="profile-stat-label">Transactions</span>
@@ -49,7 +49,11 @@
                             <td>{{ t.date }}</td>
                             <td>{{ t.description }}</td>
                             <td><span class="badge cat-{{ t.category|lower }}">{{ t.category }}</span></td>
-                            <td class="is-amount">₹{{ "{:,}".format(t.amount) }}</td>
+                            <td class="is-amount">₹{{ "{:,.2f}".format(t.amount) }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4">No transactions yet.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -64,10 +68,12 @@
                 <li class="profile-cat cat-{{ c.name|lower }}" tabindex="0" role="button" aria-pressed="false">
                     <div class="profile-cat-head">
                         <span class="profile-cat-name">{{ c.name }}</span>
-                        <span class="profile-cat-total">₹{{ "{:,}".format(c.total) }} · {{ c.percent }}%</span>
+                        <span class="profile-cat-total">₹{{ "{:,.2f}".format(c.total) }} · {{ c.percent }}%</span>
                     </div>
                     <progress class="profile-cat-bar" value="{{ c.percent }}" max="100">{{ c.percent }}%</progress>
                 </li>
+                {% else %}
+                <li class="profile-cat-empty">No spending to break down yet.</li>
                 {% endfor %}
             </ul>
         </div>
