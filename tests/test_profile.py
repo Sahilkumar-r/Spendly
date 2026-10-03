@@ -58,18 +58,50 @@ def test_profile_shows_the_signed_in_user_not_the_demo_user(client):
 def test_profile_shows_summary_stats(logged_in):
     html = logged_in.get("/profile").data.decode()
     assert html.count('class="profile-stat"') == 3
-    assert "₹8,049" in html
+    assert "₹6,121.49" in html
+    assert ">Shopping<" in html
 
 
 def test_profile_shows_transaction_rows(logged_in):
     html = logged_in.get("/profile").data.decode()
     tbody = html.split("<tbody>")[1].split("</tbody>")[0]
-    assert tbody.count("<tr>") >= 3
+    assert tbody.count("<tr>") == 8
+    assert "Electricity bill" in tbody
 
 
 def test_profile_shows_category_breakdown(logged_in):
     html = logged_in.get("/profile").data.decode()
     assert html.count('class="profile-cat ') >= 3
+
+
+def test_profile_percentages_sum_to_100(logged_in):
+    html = logged_in.get("/profile").data.decode()
+    percents = [int(x) for x in re.findall(r"· (\d+)%", html)]
+    assert sum(percents) == 100
+
+
+def test_profile_empty_state_for_new_user(client):
+    client.post(
+        "/register",
+        data={"name": "New User", "email": "new@example.com", "password": "password123"},
+    )
+    client.post("/login", data={"email": "new@example.com", "password": "password123"})
+    resp = client.get("/profile")
+    html = resp.data.decode()
+    assert resp.status_code == 200
+    assert "No transactions yet." in html
+    assert "No spending to break down yet." in html
+    assert "₹0.00" in html
+
+
+def test_profile_only_shows_own_expenses(client):
+    client.post(
+        "/register",
+        data={"name": "Other", "email": "other@example.com", "password": "password123"},
+    )
+    client.post("/login", data={"email": "other@example.com", "password": "password123"})
+    html = client.get("/profile").data.decode()
+    assert "Electricity bill" not in html
 
 
 def test_navbar_shows_logged_in_state(logged_in):

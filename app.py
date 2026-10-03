@@ -100,6 +100,91 @@ def privacy():
     return render_template("privacy.html")
 
 
+# ==== SECTION 1: TRANSACTIONS (sub-agent-01) ====
+def _build_transactions(user_id):
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT date, description, category, amount FROM expenses "
+            "WHERE user_id = ? ORDER BY date DESC, id DESC LIMIT 10",
+            (user_id,),
+        ).fetchall()
+    finally:
+        conn.close()
+    return [
+        {
+            "date": datetime.strptime(r["date"], "%Y-%m-%d").strftime("%d %b %Y"),
+            "description": r["description"] or "",
+            "category": r["category"],
+            "amount": float(r["amount"]),
+        }
+        for r in rows
+    ]
+
+
+# ==== END SECTION 1 ====
+
+
+# ==== SECTION 2: SUMMARY (sub-agent-02) ====
+def _build_stats(user_id):
+    conn = get_db()
+    try:
+        totals = conn.execute(
+            "SELECT COALESCE(SUM(amount), 0) AS total, COUNT(*) AS cnt "
+            "FROM expenses WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()
+        top = conn.execute(
+            "SELECT category FROM expenses WHERE user_id = ? "
+            "GROUP BY category ORDER BY SUM(amount) DESC LIMIT 1",
+            (user_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+    return {
+        "total_spent": float(totals["total"]),
+        "transaction_count": int(totals["cnt"]),
+        "top_category": top["category"] if top else "—",
+    }
+
+
+# ==== END SECTION 2 ====
+
+
+# ==== SECTION 3: CATEGORIES (sub-agent-03) ====
+def _build_categories(user_id):
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT category, SUM(amount) FROM expenses WHERE user_id = ? "
+            "GROUP BY category ORDER BY SUM(amount) DESC",
+            (user_id,),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    grand = sum(float(r[1] or 0) for r in rows)
+    if not rows or grand <= 0:
+        return []
+
+    cats = []
+    for r in rows:
+        total = float(r[1] or 0)
+        exact = total * 100 / grand
+        cats.append({"name": r[0], "total": total, "percent": int(exact),
+                     "_rem": exact - int(exact)})
+
+    leftover = 100 - sum(c["percent"] for c in cats)
+    for c in sorted(cats, key=lambda c: c["_rem"], reverse=True)[:max(leftover, 0)]:
+        c["percent"] += 1
+    for c in cats:
+        del c["_rem"]
+    return cats
+
+
+# ==== END SECTION 3 ====
+
+
 @app.route("/profile")
 def profile():
     if not session.get("user_id"):
@@ -118,30 +203,10 @@ def profile():
         ).strftime("%B %Y"),
     }
 
-    # Stats, transactions and categories are hardcoded for Step 4 —
-    # replaced by real queries via get_db() in Step 5.
-    stats = {
-        "total_spent": 8049,
-        "transaction_count": 8,
-        "top_category": "Bills",
-    }
-    transactions = [
-        {"date": "28 Sep 2026", "description": "Swiggy dinner", "category": "Food", "amount": 420},
-        {"date": "26 Sep 2026", "description": "Metro card recharge", "category": "Transport", "amount": 500},
-        {"date": "24 Sep 2026", "description": "Electricity bill", "category": "Bills", "amount": 1800},
-        {"date": "21 Sep 2026", "description": "Groceries from DMart", "category": "Food", "amount": 1250},
-        {"date": "18 Sep 2026", "description": "Myntra order", "category": "Shopping", "amount": 2150},
-        {"date": "15 Sep 2026", "description": "Movie tickets at PVR", "category": "Entertainment", "amount": 600},
-        {"date": "12 Sep 2026", "description": "Ola cab", "category": "Transport", "amount": 330},
-        {"date": "10 Sep 2026", "description": "Broadband bill", "category": "Bills", "amount": 999},
-    ]
-    categories = [
-        {"name": "Bills", "total": 2799, "percent": 35},
-        {"name": "Shopping", "total": 2150, "percent": 27},
-        {"name": "Food", "total": 1670, "percent": 21},
-        {"name": "Transport", "total": 830, "percent": 10},
-        {"name": "Entertainment", "total": 600, "percent": 7},
-    ]
+    uid = session["user_id"]
+    stats = _build_stats(uid)
+    transactions = _build_transactions(uid)
+    categories = _build_categories(uid)
 
     return render_template(
         "profile.html",
