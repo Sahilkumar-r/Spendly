@@ -52,7 +52,10 @@
         </div>
 
         <div class="profile-panel">
-            <h2 class="profile-section-title">Transaction history</h2>
+            <div class="profile-panel-header">
+                <h2 class="profile-section-title">Transaction history</h2>
+                <a href="{{ url_for('add_expense') }}" class="btn-primary">Add expense</a>
+            </div>
             <div class="profile-table-wrap">
                 <table class="profile-table">
                     <thead>
@@ -75,6 +78,9 @@
                         <tr>
                             <td colspan="4">
                                 {% if filters.active %}No transactions in this period.{% else %}No transactions yet.{% endif %}
+                                <div class="profile-empty-action">
+                                    <a href="{{ url_for('add_expense') }}" class="btn-ghost">Add an expense</a>
+                                </div>
                             </td>
                         </tr>
                         {% endfor %}
