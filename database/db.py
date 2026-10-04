@@ -96,6 +96,34 @@ def create_expense(user_id, amount, category, date, description):
         conn.close()
 
 
+def get_expense(expense_id, user_id):
+    """Return the expense row only if it belongs to `user_id`, else None."""
+    conn = get_db()
+    try:
+        return conn.execute(
+            "SELECT id, user_id, amount, category, date, description, created_at "
+            "FROM expenses WHERE id = ? AND user_id = ?",
+            (expense_id, user_id),
+        ).fetchone()
+    finally:
+        conn.close()
+
+
+def update_expense(expense_id, user_id, amount, category, date, description):
+    """Update one expense and return the number of rows changed (0 = no match)."""
+    conn = get_db()
+    try:
+        cur = conn.execute(
+            "UPDATE expenses SET amount = ?, category = ?, date = ?, "
+            "description = ? WHERE id = ? AND user_id = ?",
+            (amount, category, date, description, expense_id, user_id),
+        )
+        conn.commit()
+        return cur.rowcount
+    finally:
+        conn.close()
+
+
 def seed_db():
     conn = get_db()
     try:

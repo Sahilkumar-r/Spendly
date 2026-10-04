@@ -5,17 +5,27 @@ import sqlite3
 from datetime import datetime
 from functools import wraps
 
-from flask import Flask, redirect, render_template, request, session, url_for
+from flask import (
+    Flask,
+    abort,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+)
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from database.db import (
     create_expense,
     create_user,
     get_db,
+    get_expense,
     get_user_by_email,
     get_user_by_id,
     init_db,
     seed_db,
+    update_expense,
 )
 
 CATEGORIES = [
@@ -29,6 +39,7 @@ CATEGORIES = [
 ]
 MAX_DESCRIPTION_LENGTH = 200
 MAX_AMOUNT = 10_000_000
+EXPENSE_FIELDS = ("amount", "category", "date", "description")
 
 app = Flask(__name__)
 # Without SECRET_KEY set, fall back to a random per-process key: sessions
@@ -174,7 +185,7 @@ def _build_transactions(user_id, start_date=None, end_date=None):
     conn = get_db()
     try:
         rows = conn.execute(
-            "SELECT date, description, category, amount FROM expenses "
+            "SELECT id, date, description, category, amount FROM expenses "
             "WHERE user_id = ?"
             + clause
             + " ORDER BY date DESC, id DESC LIMIT 10",
@@ -184,6 +195,7 @@ def _build_transactions(user_id, start_date=None, end_date=None):
         conn.close()
     return [
         {
+            "id": r["id"],
             "date": datetime.strptime(r["date"], "%Y-%m-%d").strftime("%d %b %Y"),
             "description": r["description"] or "",
             "category": r["category"],
@@ -290,14 +302,30 @@ def profile():
 # ------------------------------------------------------------------ #
 
 
-def _render_expense_form(values, error=None):
+def _render_expense_form(
+    values, error=None, template="add_expense.html", expense_id=None
+):
     return render_template(
-        "add_expense.html",
+        template,
         categories=CATEGORIES,
         values=values,
         error=error,
         max_description_length=MAX_DESCRIPTION_LENGTH,
+        expense_id=expense_id,
     )
+
+
+def _read_expense_form():
+    return {key: request.form.get(key, "").strip() for key in EXPENSE_FIELDS}
+
+
+def _expense_to_form_values(expense):
+    return {
+        "amount": f"{expense['amount']:.2f}",
+        "category": expense["category"],
+        "date": expense["date"],
+        "description": expense["description"] or "",
+    }
 
 
 def _validate_expense_form(values):
@@ -341,10 +369,7 @@ def add_expense():
             }
         )
 
-    values = {
-        key: request.form.get(key, "").strip()
-        for key in ("amount", "category", "date", "description")
-    }
+    values = _read_expense_form()
     amount, error = _validate_expense_form(values)
     if error:
         return _render_expense_form(values, error)
@@ -359,9 +384,39 @@ def add_expense():
     return redirect(url_for("profile"))
 
 
-@app.route("/expenses/<int:id>/edit")
+@app.route("/expenses/<int:id>/edit", methods=["GET", "POST"])
+@login_required
 def edit_expense(id):
-    return "Edit expense — coming in Step 8"
+    user_id = session["user_id"]
+    expense = get_expense(id, user_id)
+    if expense is None:
+        abort(404)
+
+    if request.method == "GET":
+        return _render_expense_form(
+            _expense_to_form_values(expense),
+            template="edit_expense.html",
+            expense_id=id,
+        )
+
+    values = _read_expense_form()
+    amount, error = _validate_expense_form(values)
+    if error:
+        return _render_expense_form(
+            values, error, template="edit_expense.html", expense_id=id
+        )
+
+    updated = update_expense(
+        id,
+        user_id,
+        amount,
+        values["category"],
+        values["date"],
+        values["description"] or None,
+    )
+    if updated == 0:
+        abort(404)
+    return redirect(url_for("profile"))
 
 
 @app.route("/expenses/<int:id>/delete")

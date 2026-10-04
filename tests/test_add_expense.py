@@ -348,12 +348,6 @@ def test_script_description_escaped_on_profile(logged_in):
 # Other steps unchanged, template hygiene                             #
 # ------------------------------------------------------------------ #
 
-def test_edit_stub_unchanged(logged_in):
-    resp = logged_in.get("/expenses/1/edit")
-    assert resp.status_code == 200
-    assert resp.data.decode() == "Edit expense — coming in Step 8"
-
-
 def test_delete_stub_unchanged(logged_in):
     resp = logged_in.get("/expenses/1/delete")
     assert resp.status_code == 200

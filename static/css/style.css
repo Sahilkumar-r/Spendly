@@ -891,6 +891,29 @@ select.form-input { cursor: pointer; }
     font-variant-numeric: tabular-nums;
 }
 
+.profile-table .is-action {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.row-action {
+    display: inline-block;
+    color: var(--ink-soft);
+    font-size: 0.85rem;
+    text-decoration: none;
+    padding: 0.25rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.row-action:hover,
+.row-action:focus-visible {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--paper);
+}
+
 /* Category colours — shared by badges and breakdown bars */
 .cat-food          { --cat-color: var(--hero-green); }
 .cat-transport     { --cat-color: var(--hero-blue); }
