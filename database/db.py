@@ -124,6 +124,20 @@ def update_expense(expense_id, user_id, amount, category, date, description):
         conn.close()
 
 
+def remove_expense(expense_id, user_id):
+    """Delete one expense and return the number of rows removed (0 = no match)."""
+    conn = get_db()
+    try:
+        cur = conn.execute(
+            "DELETE FROM expenses WHERE id = ? AND user_id = ?",
+            (expense_id, user_id),
+        )
+        conn.commit()
+        return cur.rowcount
+    finally:
+        conn.close()
+
+
 def seed_db():
     conn = get_db()
     try:

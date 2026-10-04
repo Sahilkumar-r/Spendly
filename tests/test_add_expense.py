@@ -348,12 +348,6 @@ def test_script_description_escaped_on_profile(logged_in):
 # Other steps unchanged, template hygiene                             #
 # ------------------------------------------------------------------ #
 
-def test_delete_stub_unchanged(logged_in):
-    resp = logged_in.get("/expenses/1/delete")
-    assert resp.status_code == 200
-    assert resp.data.decode() == "Delete expense — coming in Step 9"
-
-
 def test_template_has_no_hex_colours_or_inline_styles():
     source = TEMPLATE.read_text(encoding="utf-8")
     assert not re.search(r"#[0-9a-fA-F]{3,8}\b", source), "Hex colour found"

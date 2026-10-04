@@ -76,6 +76,7 @@
                             <td class="is-amount">₹{{ "{:,.2f}".format(t.amount) }}</td>
                             <td class="is-action">
                                 <a href="{{ url_for('edit_expense', id=t.id) }}" class="row-action">Edit</a>
+                                <a href="{{ url_for('delete_expense', id=t.id) }}" class="row-action row-action--danger">Delete</a>
                             </td>
                         </tr>
                         {% else %}

@@ -317,12 +317,6 @@ def test_empty_profile_state_still_renders(new_user_client):
     assert 'colspan="5"' in resp.data.decode()
 
 
-def test_delete_stub_unchanged(client):
-    resp = client.get("/expenses/1/delete")
-    assert resp.status_code == 200
-    assert b"coming in Step 9" in resp.data
-
-
 def test_add_expense_still_works(logged_in):
     count = _count()
     assert logged_in.get("/expenses/add").status_code == 200
