@@ -607,6 +607,29 @@ select.form-input { cursor: pointer; }
 
 .btn-submit:hover { background: var(--accent); }
 
+.btn-danger { background: var(--danger); }
+.btn-danger:hover,
+.btn-danger:focus-visible { background: var(--ink); }
+
+.expense-summary { margin: 0 0 1.25rem; }
+
+.expense-summary-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.6rem 0;
+    border-bottom: 1px solid var(--border-soft);
+}
+
+.expense-summary dt { color: var(--ink-muted); }
+
+.expense-summary dd {
+    margin: 0;
+    font-weight: 500;
+    text-align: right;
+    overflow-wrap: anywhere;
+}
+
 .auth-switch {
     text-align: center;
     font-size: 0.875rem;
@@ -911,6 +934,18 @@ select.form-input { cursor: pointer; }
 .row-action:focus-visible {
     background: var(--accent);
     border-color: var(--accent);
+    color: var(--paper);
+}
+
+.row-action--danger {
+    color: var(--danger);
+    margin-left: 0.5rem;
+}
+
+.row-action--danger:hover,
+.row-action--danger:focus-visible {
+    background: var(--danger);
+    border-color: var(--danger);
     color: var(--paper);
 }
 
